@@ -47,4 +47,5 @@ jobs:
           git add firmware/latest.bin
           git commit -m "Auto-update firmware"
           git push
+        
 

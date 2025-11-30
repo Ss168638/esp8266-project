@@ -11,7 +11,7 @@ const char* WIFI_PASS = "ss168638@";
 
 // Example: raw GitHub URL or CDN URL to version.txt and binary
 const char* VERSION_URL  = "https://raw.githubusercontent.com/Ss168638/esp8266-project/firmware/version.json";
-const char* FIRMWARE_URL = "https://raw.githubusercontent.com/Ss168638/esp8266-project/firmware/latest.bin";
+const char* FIRMWARE_URL = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/latest.bin";
 
 // Current firmware version (update this in code when you ship new firmware that you want devices to start with)
 String currentVersion = "1.0.0";
