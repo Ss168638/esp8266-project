@@ -34,7 +34,7 @@ jobs:
       - name: Move firmware to repo folder
         run: |
           mkdir -p firmware
-          cp .pio/build/esp8266/firmware.bin firmware/latest.bin
+          cp .pio/build/*/firmware.bin firmware/latest.bin
       
       - name: Commit and push firmware
         run: |
