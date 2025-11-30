@@ -4,26 +4,31 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecureBearSSL.h>
+#ifndef UPDATE_SIZE_UNKNOWN
+#define UPDATE_SIZE_UNKNOWN (uint32_t)0xFFFFFFFF
+#endif
 
-const char* WIFI_SSID = "SURAJ-5G";
+const char* WIFI_SSID = "SURAJ";
 const char* WIFI_PASS = "ss168638@";
 
 
 // Example: raw GitHub URL or CDN URL to version.txt and binary
-const char* VERSION_URL  = "https://raw.githubusercontent.com/Ss168638/esp8266-project/firmware/version.json";
-const char* FIRMWARE_URL = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/latest.bin";
+const char* VERSION_URL  = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/version.json";
+const char* FIRMWARE_URL = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/latest.bin?raw=1";
 
 // Current firmware version (update this in code when you ship new firmware that you want devices to start with)
 String currentVersion = "1.0.0";
 
 unsigned long lastCheck = 0;
-const unsigned long CHECK_INTERVAL = 1000UL * 60 * 10; // check every 10 minutes
+const unsigned long CHECK_INTERVAL = 1000UL * 60 * 1; // check every 10 minutes
 
 void checkForUpdate();
 bool downloadAndUpdate(const char* url);
 
 void setup(){
   Serial.begin(115200);
+  Serial.println("OTA Release");
+  Serial.println("Reboot cause: " + String(ESP.getResetReason()));
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.printf("Connecting to %s\n", WIFI_SSID);
   while (WiFi.status() != WL_CONNECTED) {
@@ -31,6 +36,7 @@ void setup(){
     Serial.print(".");
   }
   Serial.println("\nConnected: " + WiFi.localIP().toString());
+  Serial.println(WiFi.dnsIP());
   // Optionally update currentVersion from flash or SPIFFS here
   checkForUpdate();
 }
@@ -81,6 +87,7 @@ bool downloadAndUpdate(const char* url){
 
   HTTPClient http;
   std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
+  client->setBufferSizes(1024, 1024);
   client->setInsecure(); // WARNING: for production, validate certs instead
   http.begin(*client, url);
   int httpCode = http.GET();
@@ -98,7 +105,7 @@ bool downloadAndUpdate(const char* url){
   WiFiClient *stream = http.getStreamPtr();
   Serial.printf("Firmware size: %d\n", contentLength);
 
-  if (!Update.begin(contentLength > 0 ? contentLength : U_FLASH)) {
+  if (!Update.begin(contentLength > 0 ? contentLength : UPDATE_SIZE_UNKNOWN)) {
     Serial.println("Not enough space to begin update");
     http.end();
     return false;
@@ -129,3 +136,4 @@ bool downloadAndUpdate(const char* url){
   http.end();
   return false;
 }
+
