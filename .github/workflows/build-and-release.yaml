@@ -5,6 +5,10 @@ on:
     branches: [ main ]
     tags: ['*']     # releases are created when you push tags like 1.0.0
 
+permissions:
+  contents: write
+
+
 jobs:
   build:
     runs-on: ubuntu-latest
