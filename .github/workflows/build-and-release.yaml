@@ -3,7 +3,6 @@ name: Build & Release Firmware
 on:
   push:
     branches: [ main ]
-  push:
     tags: ['*']     # releases are created when you push tags like 1.0.0
 
 jobs:
