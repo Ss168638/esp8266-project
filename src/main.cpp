@@ -5,8 +5,8 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecureBearSSL.h>
 
-const char* ssid = "SURAJ-5G";
-const char* pass = "ss168638@";
+const char* WIFI_SSID = "SURAJ-5G";
+const char* WIFI_PASS = "ss168638@";
 
 
 // Example: raw GitHub URL or CDN URL to version.txt and binary
@@ -18,6 +18,9 @@ String currentVersion = "1.0.0";
 
 unsigned long lastCheck = 0;
 const unsigned long CHECK_INTERVAL = 1000UL * 60 * 10; // check every 10 minutes
+
+void checkForUpdate();
+bool downloadAndUpdate(const char* url);
 
 void setup(){
   Serial.begin(115200);
@@ -104,7 +107,7 @@ bool downloadAndUpdate(const char* url){
   Serial.println("Writing to flash...");
   size_t written = Update.writeStream(*stream);
 
-  if (written == contentLength || contentLength == -1) {
+  if ((contentLength == -1) || (written == (size_t)contentLength)) {
     Serial.println("Written : " + String(written) + " bytes");
   } else {
     Serial.printf("Written only %u/%d bytes\n", (unsigned)written, contentLength);
