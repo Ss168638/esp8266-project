@@ -37,11 +37,10 @@ jobs:
           cp .pio/build/esp8266/firmware.bin firmware/latest.bin
       
       - name: Commit and push firmware
-  	run: |
-    	 git config --local user.email "github-actions@github.com"
-    	 git config --local user.name "GitHub Actions"
-    	 git add firmware/latest.bin
-    	 git commit -m "Auto-update firmware"
-    	 git push
-
+        run: |
+          git config --local user.email "github-actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add firmware/latest.bin
+          git commit -m "Auto-update firmware"
+          git push
 
