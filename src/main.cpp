@@ -17,7 +17,7 @@ const char* password = "ss168638@";
 
 // ---- OTA files on GitHub ----
 const char* VERSION_URL  = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/version.json";
-const char* FIRMWARE_URL = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/latest.bin?raw=1";
+const char* FIRMWARE_URL = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/firmware.bin?raw=1";
 
 // Current version on device (change when you build new firmware)
 String CURRENT_VERSION = "1.0.3";
