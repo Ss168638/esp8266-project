@@ -44,7 +44,7 @@ jobs:
         run: |
           git config --local user.email "github-actions@github.com"
           git config --local user.name "GitHub Actions"
-          git add firmware/latest.bin
+          git add firmware/firmware.bin
           git commit -m "Auto-update firmware"
           git push
         
