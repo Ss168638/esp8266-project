@@ -1,139 +1,180 @@
-// ESP8266 Pull-OTA example
-// Put a text file at VERSION_URL containing e.g. v1.0.2
-// Put compiled firmware binary at FIRMWARE_URL
+/*
+  ESP8266 OTA from GitHub (HTTPS)
+  - WiFi: SSID "SURAJ", PASS "Ss168638@"
+  - VERSION_URL should be plain text like: 1.0.1
+  - If you want real TLS verification, set FINGERPRINT to SHA1 fingerprint (colon-separated).
+    Otherwise leave empty to use setInsecure() (not recommended for production).
+*/
+
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
-#include <WiFiClientSecureBearSSL.h>
-#ifndef UPDATE_SIZE_UNKNOWN
-#define UPDATE_SIZE_UNKNOWN (uint32_t)0xFFFFFFFF
-#endif
+#include <WiFiClientSecure.h>
+#include <Updater.h> // part of ESP8266 core
 
-const char* WIFI_SSID = "SURAJ";
-const char* WIFI_PASS = "ss168638@";
+// ---- WiFi ----
+const char* ssid     = "SURAJ";
+const char* password = "ss168638@";
 
-
-// Example: raw GitHub URL or CDN URL to version.txt and binary
+// ---- OTA files on GitHub ----
 const char* VERSION_URL  = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/version.json";
 const char* FIRMWARE_URL = "https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/latest.bin?raw=1";
 
-// Current firmware version (update this in code when you ship new firmware that you want devices to start with)
-String currentVersion = "1.0.0";
+// Current version on device (change when you build new firmware)
+String CURRENT_VERSION = "1.0.3";
 
-unsigned long lastCheck = 0;
-const unsigned long CHECK_INTERVAL = 1000UL * 60 * 1; // check every 10 minutes
+// OPTIONAL fingerprint (leave "" to use insecure). Example: "5F:A1:23:...:EF"
+const char* FINGERPRINT = "";  
 
-void checkForUpdate();
-bool downloadAndUpdate(const char* url);
+// Forward declarations (so functions can be defined after setup)
+String getVersionFromServer();
+bool downloadAndFlash(const char* url);
 
-void setup(){
+WiFiClientSecure secureClient;
+
+void setup() {
   Serial.begin(115200);
-  Serial.println("OTA Release");
-  Serial.println("Reboot cause: " + String(ESP.getResetReason()));
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.printf("Connecting to %s\n", WIFI_SSID);
+  delay(200);
+
+  Serial.println();
+  Serial.println("Connecting to WiFi...");
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  unsigned long start = millis();
   while (WiFi.status() != WL_CONNECTED) {
-    delay(300);
     Serial.print(".");
-  }
-  Serial.println("\nConnected: " + WiFi.localIP().toString());
-  Serial.println(WiFi.dnsIP());
-  // Optionally update currentVersion from flash or SPIFFS here
-  checkForUpdate();
-}
-
-void loop(){
-  if (millis() - lastCheck > CHECK_INTERVAL) {
-    lastCheck = millis();
-    checkForUpdate();
-  }
-  // your app logic here
-  delay(1000);
-}
-
-void checkForUpdate(){
-  Serial.println("Checking for update...");
-  HTTPClient http;
-  // Use insecure client for convenience; for production use proper TLS verification
-  std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
-  client->setInsecure(); // WARNING: insecure TLS (no cert verification). Replace in prod.
-  http.begin(*client, VERSION_URL);
-  int code = http.GET();
-  if(code == HTTP_CODE_OK){
-    String newVersion = http.getString();
-    newVersion.trim();
-    Serial.println("Remote version: " + newVersion);
-    if(newVersion.length() > 0 && newVersion != currentVersion){
-      Serial.println("New version available: " + newVersion);
-      if(downloadAndUpdate(FIRMWARE_URL)){
-        Serial.println("Update OK. Setting currentVersion and rebooting...");
-        currentVersion = newVersion;
-        delay(1000);
-        ESP.restart();
-      } else {
-        Serial.println("Update failed.");
-      }
-    } else {
-      Serial.println("No update required.");
+    delay(300);
+    if (millis() - start > 30000) { // 30s timeout
+      Serial.println("\nWiFi connect timeout, restarting...");
+      delay(1000);
+      ESP.restart();
     }
-  } else {
-    Serial.printf("Version check failed, HTTP code: %d\n", code);
   }
-  http.end();
+
+  Serial.println("\nWiFi connected. IP: " + WiFi.localIP().toString());
+
+  if (strlen(FINGERPRINT) == 0) {
+    Serial.println("WARNING: Using insecure TLS (set FINGERPRINT for verification).");
+    secureClient.setInsecure();
+  } else {
+    secureClient.setFingerprint(FINGERPRINT);
+  }
+
+  String latestVersion = getVersionFromServer();
+
+  if (latestVersion == "") {
+    Serial.println("Failed to get version file. Aborting update check.");
+    return;
+  }
+
+  Serial.println("Current : " + CURRENT_VERSION);
+  Serial.println("Latest  : " + latestVersion);
+
+  if (latestVersion == CURRENT_VERSION) {
+    Serial.println("Already up to date.");
+    return;
+  }
+
+  Serial.println("UPDATE REQUIRED! Downloading firmware...");
+  bool ok = downloadAndFlash(FIRMWARE_URL);
+
+  if (ok) {
+    Serial.println("OTA UPDATE SUCCESS — Rebooting...");
+    delay(1500);
+    ESP.restart();
+  } else {
+    Serial.println("OTA UPDATE FAILED!");
+  }
 }
 
-bool downloadAndUpdate(const char* url){
-  Serial.println("Starting download: ");
-  Serial.println(url);
+void loop() {
+  // no-op
+}
 
+// --------------------------------------------------
+// Get version.txt (plain text)
+// --------------------------------------------------
+String getVersionFromServer() {
   HTTPClient http;
-  std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
-  client->setBufferSizes(1024, 1024);
-  client->setInsecure(); // WARNING: for production, validate certs instead
-  http.begin(*client, url);
-  int httpCode = http.GET();
-  if (httpCode != HTTP_CODE_OK) {
-    Serial.printf("Firmware download failed, HTTP code: %d\n", httpCode);
+
+  Serial.println("Downloading version file...");
+
+  // begin with secure client
+  if (!http.begin(secureClient, VERSION_URL)) {
+    Serial.println("HTTP begin failed for version URL");
+    return "";
+  }
+
+  http.setTimeout(10000);
+  int code = http.GET();
+  if (code != HTTP_CODE_OK) {
+    Serial.printf("Version GET failed: %d\n", code);
+    http.end();
+    return "";
+  }
+
+  String ver = http.getString();
+  ver.trim();
+  http.end();
+
+  Serial.println("Remote version: " + ver);
+  return ver;
+}
+
+// --------------------------------------------------
+// Download firmware .bin and flash
+// --------------------------------------------------
+bool downloadAndFlash(const char* url) {
+  HTTPClient http;
+
+  Serial.println("Starting firmware download...");
+
+  if (!http.begin(secureClient, url)) {
+    Serial.println("HTTP begin failed (firmware)");
+    return false;
+  }
+
+  http.setTimeout(20000);
+  int code = http.GET();
+  if (code != HTTP_CODE_OK) {
+    Serial.printf("Firmware GET failed: %d\n", code);
     http.end();
     return false;
   }
 
-  int contentLength = http.getSize();
-  if(contentLength <= 0){
-    Serial.println("Content-Length not provided or zero.");
-    // still try if chunked, but Update needs size; handle carefully
-  }
-  WiFiClient *stream = http.getStreamPtr();
-  Serial.printf("Firmware size: %d\n", contentLength);
+  int len = http.getSize();
+  WiFiClient* stream = http.getStreamPtr();
 
-  if (!Update.begin(contentLength > 0 ? contentLength : UPDATE_SIZE_UNKNOWN)) {
-    Serial.println("Not enough space to begin update");
+  Serial.printf("Firmware size reported: %d bytes\n", len);
+
+  // Use reported length if available; otherwise fall back to available OTA space.
+  size_t updateSize = (len > 0) ? (size_t)len : (size_t)ESP.getFreeSketchSpace();
+
+  if (!Update.begin(updateSize)) {
+    Serial.println("Update.begin failed");
+    Update.printError(Serial);
     http.end();
     return false;
   }
 
-  Serial.println("Writing to flash...");
   size_t written = Update.writeStream(*stream);
 
-  if ((contentLength == -1) || (written == (size_t)contentLength)) {
-    Serial.println("Written : " + String(written) + " bytes");
-  } else {
-    Serial.printf("Written only %u/%d bytes\n", (unsigned)written, contentLength);
+  if (written == 0) {
+    Serial.println("No data written!");
+    Update.printError(Serial);
+    Update.end();
     http.end();
     return false;
   }
 
-  if (Update.end()) {
-    if (Update.isFinished()) {
-      Serial.println("Update successfully finished. Rebooting...");
-      http.end();
-      return true;
-    } else {
-      Serial.println("Update not finished? Something went wrong.");
-    }
-  } else {
-    Serial.printf("Update failed. Error #: %d\n", Update.getError());
+  if (!Update.end(true)) { // true sets the boot partition
+    Serial.println("Update.end failed");
+    Update.printError(Serial);
+    http.end();
+    return false;
   }
-  http.end();
-  return false;
-}
 
+  Serial.printf("Update successful, written %u bytes\n", (unsigned)written);
+  http.end();
+  return true;
+}
