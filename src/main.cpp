@@ -10,6 +10,7 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <Updater.h> // part of ESP8266 core
+#include <ArduinoJson.h>
 
 // ---- WiFi ----
 const char* ssid     = "SURAJ";
@@ -99,9 +100,8 @@ String getVersionFromServer() {
 
   Serial.println("Downloading version file...");
 
-  // begin with secure client
   if (!http.begin(secureClient, VERSION_URL)) {
-    Serial.println("HTTP begin failed for version URL");
+    Serial.println("HTTP begin failed (version URL)");
     return "";
   }
 
@@ -113,14 +113,31 @@ String getVersionFromServer() {
     return "";
   }
 
-  String ver = http.getString();
-  ver.trim();
+  String payload = http.getString();
   http.end();
 
-  Serial.println("Remote version: " + ver);
-  return ver;
-}
+  Serial.println("Version JSON:");
+  Serial.println(payload);
 
+  // Parse JSON
+  StaticJsonDocument<256> doc;
+  DeserializationError err = deserializeJson(doc, payload);
+
+  if (err) {
+    Serial.printf("JSON parse error: %s\n", err.c_str());
+    return "";
+  }
+
+  // Extract "version"
+  if (!doc.containsKey("version")) {
+    Serial.println("JSON missing 'version' field");
+    return "";
+  }
+
+  String version = doc["version"].as<String>();
+  version.trim();
+  return version;
+}
 // --------------------------------------------------
 // Download firmware .bin and flash
 // --------------------------------------------------
