@@ -38,14 +38,29 @@ jobs:
       - name: Move firmware to repo folder
         run: |
           mkdir -p firmware
-          cp .pio/build/*/firmware.bin firmware/firmware.bin
-      
-      - name: Commit and push firmware
+          # find a firmware binary produced by PlatformIO (handles no-match safely)
+          firmware_file=$(ls .pio/build/*/firmware*.bin 2>/dev/null | head -n1 || true)
+          if [ -z "$firmware_file" ]; then
+            echo "No firmware binary produced by platformio — skipping copy."
+          else
+            echo "Found firmware: $firmware_file"
+            cp "$firmware_file" firmware/firmware.bin
+          fi
+
+      - name: Commit and push firmware (only if changed)
         run: |
           git config --local user.email "github-actions@github.com"
           git config --local user.name "GitHub Actions"
-          git add firmware/firmware.bin
-          git commit -m "Auto-update firmware"
-          git push
+
+          # Stage the firmware file (respects .gitignore)
+          git add -A firmware || true
+
+          # If there are no staged changes, skip commit and push
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "ci: auto-update firmware"
+            git push
+          fi
         
 
