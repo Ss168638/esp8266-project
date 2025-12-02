@@ -33,13 +33,25 @@ jobs:
           python -m pip install -U pip
           pip install -U platformio
 
-      - name: Build with PlatformIO
+      - name: Create temporary PlatformIO override (with secrets)
         env:
           WIFI_SSID: ${{ secrets.WIFI_SSID }}
           WIFI_PASSWORD: ${{ secrets.WIFI_PASSWORD }}
         run: |
-          pio run -e nodemcuv2 --project-option="build_flags=-DWIFI_SSID=\\\"${WIFI_SSID}\\\" -DWIFI_PASSWORD=\\\"${WIFI_PASSWORD}\\\"" 
+          # Create a temporary PlatformIO config that injects build_flags (not committed).
+          # We escape quotes so the build_flags contain quoted string literals.
+          cat > pio_override.ini <<EOF
+          [env:nodemcuv2]
+          build_flags =
+            -DWIFI_SSID=\\\"${WIFI_SSID}\\\"
+            -DWIFI_PASSWORD=\\\"${WIFI_PASSWORD}\\\"
+          EOF
+            echo "Created pio_override.ini (ephemeral, not committed)."
 
+      - name: Build with PlatformIO (use override)
+        run: |
+          pio run -e nodemcuv2 --project-conf pio_override.ini
+          
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
