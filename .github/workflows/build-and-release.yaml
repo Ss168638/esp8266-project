@@ -48,10 +48,10 @@ jobs:
           EOF
             echo "Created pio_override.ini (ephemeral, not committed)."
 
-      - name: Build with PlatformIO (use override)
+      - name: Build with PlatformIO
         run: |
-          pio run -e nodemcuv2 --project-conf pio_override.ini
-          
+          pio run --project-conf pio_override.ini
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
