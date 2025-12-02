@@ -3,14 +3,7 @@
 #include <OTAUpdater.h>
 // #include <secrets.h>
 
-
-// Ensure that the macros exist at compile time:
-#ifndef WIFI_SSID
-  #error "WIFI_SSID not defined"
-#endif
-#ifndef WIFI_PASSWORD
-  #error "WIFI_PASSWORD not defined"
-#endif
+// WiFi credentials defined in platformio_local.ini for security
 
 // Set the link to version.json and firmware.bin
 const char* VERSION_URL="https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/version.json";
