@@ -4,6 +4,13 @@
 // #include <secrets.h>
 
 // WiFi credentials defined in platformio_local.ini for security
+#ifndef WIFI_SSID
+  #error "WIFI_SSID not defined — CI did not inject the secret!"
+#endif
+
+#ifndef WIFI_PASSWORD
+  #error "WIFI_PASSWORD not defined — CI did not inject the secret!"
+#endif
 
 // Set the link to version.json and firmware.bin
 const char* VERSION_URL="https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/version.json";

@@ -33,23 +33,12 @@ jobs:
           python -m pip install -U pip
           pip install -U platformio
 
-      - name: Create platformio_local.ini from secrets
+      - name: Build with PlatformIO
         env:
           WIFI_SSID: ${{ secrets.WIFI_SSID }}
           WIFI_PASSWORD: ${{ secrets.WIFI_PASSWORD }}
         run: |
-          cat > platformio_local.ini <<'EOF'
-          [env:esp8266]
-          build_flags =
-            -DWIFI_SSID=\"${WIFI_SSID}\"
-              -DWIFI_PASSWORD=\"${WIFI_PASSWORD}\"
-          EOF
-          
-          echo "Created platformio_local.ini (not committed)."
-
-      - name: Build with PlatformIO
-        run: |
-          platformio run
+          pio run -e nodemcuv2 --project-option="build_flags=-DWIFI_SSID=\\\"${WIFI_SSID}\\\" -DWIFI_PASSWORD=\\\"${WIFI_PASSWORD}\\\"" 
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
