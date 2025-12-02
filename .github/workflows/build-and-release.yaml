@@ -43,8 +43,8 @@ jobs:
           cat > pio_override.ini <<EOF
           [env:nodemcuv2]
           build_flags =
-            -DWIFI_SSID=\\\"${WIFI_SSID}\\\"
-            -DWIFI_PASSWORD=\\\"${WIFI_PASSWORD}\\\"
+            -DWIFI_SSID=\"${WIFI_SSID}\"
+            -DWIFI_PASSWORD=\"${WIFI_PASSWORD}\"
           EOF
             echo "Created pio_override.ini (ephemeral, not committed)."
 
