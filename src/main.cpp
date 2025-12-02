@@ -56,6 +56,8 @@ OTAUpdater updater;
 
 unsigned long interval = 60000; // check for update every 60 seconds
 static unsigned long previousMillis = 0;
+//Function prototypes
+void checkForUpdates();
 
 void setup(){
 
