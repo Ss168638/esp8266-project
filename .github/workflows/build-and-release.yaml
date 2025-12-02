@@ -39,11 +39,12 @@ jobs:
           WIFI_PASSWORD: ${{ secrets.WIFI_PASSWORD }}
         run: |
           cat > platformio_local.ini <<'EOF'
-[env:esp8266]
-build_flags =
-  -DWIFI_SSID=\"${WIFI_SSID}\"
-  -DWIFI_PASSWORD=\"${WIFI_PASSWORD}\"
-EOF
+          [env:esp8266]
+          build_flags =
+            -DWIFI_SSID=\"${WIFI_SSID}\"
+              -DWIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+          EOF
+          
           echo "Created platformio_local.ini (not committed)."
 
       - name: Build with PlatformIO
