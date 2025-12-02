@@ -52,6 +52,9 @@ const char* FIRMWARE_URL="https://raw.githubusercontent.com/Ss168638/esp8266-pro
 
 OTAUpdater updater;
 
+unsigned long interval = 60000; // check for update every 60 seconds
+static unsigned long previousMillis = 0;
+
 void setup(){
 
   // Initialize the digital pin as an output
@@ -83,7 +86,7 @@ void setup(){
   updater.setUrls(VERSION_URL,FIRMWARE_URL);
   delay(100);
   Serial.println("Setting current version...");
-  updater.setCurrentVersion("1.0.3");
+  updater.setCurrentVersion("1.0.4");
   delay(100);
 
   Serial.println("Starting OTA updater...");
@@ -91,10 +94,23 @@ void setup(){
   if(updater.checkAndUpdate()){
     Serial.println("OTA UPDATE SUCCESSFUL!");
   }
+  previousMillis = millis();
 }
 void loop(){
+  Serial.println("LED ON");
   digitalWrite(ledPin, HIGH);   // turn the LED on
   delay(1000);                  // wait for 1 second
+  Serial.println("LED OFF");
   digitalWrite(ledPin, LOW);    // turn the LED off
   delay(1000);                  // wait for 1 second
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    Serial.println("Checking for OTA update...");
+    // updater.beginClient();
+    if(updater.checkAndUpdate()){
+      Serial.println("OTA UPDATE SUCCESSFUL!");
+    }
+  }
 }
