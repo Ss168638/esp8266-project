@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <OTAUpdater.h>
-// #include <secrets.h>
+// #include <secrets.h> //Uncomment when flashing locally with secrets
+
+#define VERSION "1.0.5"
 
 const char* github_ca_cert = R"EOF(-----BEGIN CERTIFICATE-----
 MIIEoTCCBEigAwIBAgIRAKtmhrVie+gFloITMBKGSfUwCgYIKoZIzj0EAwIwgY8x
@@ -86,7 +88,7 @@ void setup(){
   updater.setUrls(VERSION_URL,FIRMWARE_URL);
   delay(100);
   Serial.println("Setting current version...");
-  updater.setCurrentVersion("1.0.4");
+  updater.setCurrentVersion(VERSION);
   delay(100);
 
   Serial.println("Starting OTA updater...");
@@ -97,6 +99,7 @@ void setup(){
   previousMillis = millis();
 }
 void loop(){
+  //Other functionality can go here
   Serial.println("LED ON");
   digitalWrite(ledPin, HIGH);   // turn the LED on
   delay(1000);                  // wait for 1 second
@@ -104,13 +107,20 @@ void loop(){
   digitalWrite(ledPin, LOW);    // turn the LED off
   delay(1000);                  // wait for 1 second
 
+// Check for updates every interval
+  checkForUpdates();
+}
+
+// This function checks for updates at regular intervals 60 seconds
+void checkForUpdates(){
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
+  if(currentMillis - previousMillis >= interval){
     previousMillis = currentMillis;
-    Serial.println("Checking for OTA update...");
-    // updater.beginClient();
+    Serial.println("Checking for updates...");
     if(updater.checkAndUpdate()){
       Serial.println("OTA UPDATE SUCCESSFUL!");
+    } else {
+      Serial.println("No update available.");
     }
   }
 }
