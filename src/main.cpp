@@ -1,13 +1,27 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <OTAUpdater.h>
-const char* ssid="SURAJ";const char* pass="ss168638@";
+// #include <secrets.h>
+
+
+// Ensure that the macros exist at compile time:
+#ifndef WIFI_SSID
+  #error "WIFI_SSID not defined"
+#endif
+#ifndef WIFI_PASSWORD
+  #error "WIFI_PASSWORD not defined"
+#endif
+
+// Set the link to version.json and firmware.bin
 const char* VERSION_URL="https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/version.json";
 const char* FIRMWARE_URL="https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/firmware.bin?raw=1";
+
 OTAUpdater updater;
+
 void setup(){
+
   Serial.begin(115200);
-  WiFi.begin(ssid,pass);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while(WiFi.status()!=WL_CONNECTED){
     delay(300);
   } 
