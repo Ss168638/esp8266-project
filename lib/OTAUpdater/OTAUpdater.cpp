@@ -17,6 +17,12 @@ void OTAUpdater::setFingerprint(const char* f) {
     if (f) _fingerprint = _normalizeFingerprint(f);
 }
 
+void OTAUpdater::setCAcert(const char* ca) {
+    if (ca) {
+        _caCert = String(ca);
+    }
+}
+
 void OTAUpdater::setProgressCallback(void (*cb)(size_t, size_t)) {
     _progressCb = cb;
 }
@@ -41,31 +47,43 @@ String OTAUpdater::_normalizeFingerprint(const char* fp) {
 }
 
 void OTAUpdater::_initTlsClient() {
-    if (_fingerprint.length() == 0 || _fingerprint.length() != 40) {
-        _secureClient.setInsecure();
+    // Prefer CA certificate if provided
+    if (_caCert != nullptr && _caCert.length() > 0) {
+        certList = new BearSSL::X509List(_caCert.c_str());
+        _secureClient.setTrustAnchors(certList);
+        Serial.println("TLS client configured with CA certificate");
         return;
     }
 
-    uint8_t fpb[20];
-    for (int i = 0; i < 20; i++) {
-        auto hex = [](char c) {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-            return -1;
-        };
+    // If CA cert not available or failed, try fingerprint
+    if (_fingerprint.length() == 40) {
+        uint8_t fpb[20];
+        for (int i = 0; i < 20; i++) {
+            auto hex = [](char c) {
+                if (c >= '0' && c <= '9') return c - '0';
+                if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                return -1;
+            };
 
-        int hi = hex(_fingerprint[2 * i]);
-        int lo = hex(_fingerprint[2 * i + 1]);
-        if (hi < 0 || lo < 0) {
-            _secureClient.setInsecure();
-            return;
+            int hi = hex(_fingerprint[2 * i]);
+            int lo = hex(_fingerprint[2 * i + 1]);
+            if (hi < 0 || lo < 0) {
+                _secureClient.setInsecure();
+                Serial.println("Invalid fingerprint, TLS set to insecure");
+                return;
+            }
+            fpb[i] = (hi << 4) | lo;
         }
-
-        fpb[i] = (hi << 4) | lo;
+        _secureClient.setFingerprint(fpb);
+        Serial.println("TLS client configured with fingerprint");
+        return;
     }
 
-    _secureClient.setFingerprint(fpb);
+    // If neither CA cert nor valid fingerprint, fallback to insecure
+    _secureClient.setInsecure();
+    Serial.println("No CA cert or fingerprint, TLS set to insecure");
 }
+
 
 String OTAUpdater::_fetchVersion() {
     if (!_versionUrl) return "";
