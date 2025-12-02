@@ -78,13 +78,19 @@ void setup(){
   Serial.println("\nWiFi connected. IP: "+WiFi.localIP().toString());
   
   Serial.println("Setting Github CA certificate for TLS...");
-  updater.setCAcert(github_ca_cert);
+  // updater.setCAcert(github_ca_cert);
 
   updater.setUrls(VERSION_URL,FIRMWARE_URL);
+  delay(100);
   Serial.println("Setting current version...");
   updater.setCurrentVersion("1.0.1");
-  updater.beginClient();
-  updater.checkAndUpdate();
+  delay(100);
+
+  Serial.println("Starting OTA updater...");
+  // updater.beginClient();
+  if(updater.checkAndUpdate()){
+    Serial.println("OTA UPDATE SUCCESSFUL!");
+  }
 }
 void loop(){
   digitalWrite(ledPin, HIGH);   // turn the LED on

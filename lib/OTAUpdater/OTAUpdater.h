@@ -32,5 +32,6 @@ class OTAUpdater{
         bool _downloadAndFlash(const char*);
         String _normalizeFingerprint(const char*);
         void _initTlsClient();
+        void flashProgress(size_t,size_t);
 };
 #endif

@@ -89,10 +89,11 @@ String OTAUpdater::_fetchVersion() {
     if (!_versionUrl) return "";
 
     HTTPClient http;
-    if (!http.begin(_secureClient, _versionUrl)) return "";
+    if (!http.begin(_secureClient, _versionUrl)) { Serial.println("HTTP begin failed (version URL)"); return ""; }
 
     http.setTimeout(10000);
     if (http.GET() != 200) {
+        Serial.println("Failed to fetch version file");
         http.end();
         return "";
     }
@@ -105,9 +106,15 @@ String OTAUpdater::_fetchVersion() {
     payload.replace(",\r\n}", "\r\n}");
 
     StaticJsonDocument<256> doc;
-    if (deserializeJson(doc, payload)) return "";
+    if (deserializeJson(doc, payload)) {
+        Serial.println("Failed to parse version JSON");
+        return "";
+    }
 
-    if (!doc.containsKey("version")) return "";
+    if (!doc.containsKey("version")) {
+        Serial.println("Version key not found in JSON");
+        return "";
+    }
 
     String v = doc["version"].as<String>();
     v.trim();
@@ -120,14 +127,18 @@ bool OTAUpdater::checkAndUpdate() {
 
     _initTlsClient();
 
+    Serial.println("Checking for new firmware version...");
+    Serial.println("Current version: " + _currentVersion);
     String remoteVersion = _fetchVersion();
-    if (remoteVersion.length() == 0) return false;
-    if (remoteVersion == _currentVersion) return false;
+    if (remoteVersion.length() == 0) { Serial.println("Failed to fetch remote version"); return false; }
+    if (remoteVersion == _currentVersion) { Serial.println("Firmware is up to date."); return false; }
 
+    Serial.println("New version available: " + remoteVersion);
     bool ok = _downloadAndFlash(_firmwareUrl);
 
     if (ok && _autoReboot) {
         delay(1000);
+        Serial.println("Rebooting to apply new firmware...");
         ESP.restart();
     }
 
@@ -136,19 +147,23 @@ bool OTAUpdater::checkAndUpdate() {
 
 bool OTAUpdater::_downloadAndFlash(const char* url) {
     HTTPClient http;
-    if (!http.begin(_secureClient, url)) return false;
+    if (!http.begin(_secureClient, url)) { Serial.println("Failed to begin HTTP connection"); return false; }
 
     http.setTimeout(20000);
     if (http.GET() != 200) {
+        Serial.println("Failed to download firmware");
         http.end();
         return false;
     }
 
     int len = http.getSize();
+    Serial.println("Firmware size: " + String(len) + " bytes");
     WiFiClient* stream = http.getStreamPtr();
+    Serial.println("Starting firmware update...");
 
     size_t updateSize = (len > 0) ? len : ESP.getFreeSketchSpace();
     if (!Update.begin(updateSize)) {
+        Serial.println("Not enough space for firmware update");
         Update.printError(Serial);
         http.end();
         return false;
@@ -171,12 +186,17 @@ bool OTAUpdater::_downloadAndFlash(const char* url) {
             }
 
             written += r;
+            
+            // Progress output
+            flashProgress(written, (size_t)len);
+
         } else {
             delay(1);
         }
     }
 
     if (!Update.end(true)) {
+        Serial.println("Firmware update failed");
         Update.printError(Serial);
         http.end();
         return false;
@@ -184,4 +204,9 @@ bool OTAUpdater::_downloadAndFlash(const char* url) {
 
     http.end();
     return true;
+}
+
+void OTAUpdater::flashProgress(size_t written, size_t total) {
+    int percent = (total > 0) ? (written * 100 / total) : 0;
+    Serial.printf("\rFlashing: %d%% (%d/%d bytes)", percent, (int)written, (int)total);
 }
