@@ -50,7 +50,7 @@ jobs:
 
       - name: Build with PlatformIO
         run: |
-          pio run
+          pio run -v
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
