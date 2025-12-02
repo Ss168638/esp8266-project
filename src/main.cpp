@@ -83,7 +83,7 @@ void setup(){
   updater.setUrls(VERSION_URL,FIRMWARE_URL);
   delay(100);
   Serial.println("Setting current version...");
-  updater.setCurrentVersion("1.0.1");
+  updater.setCurrentVersion("1.0.3");
   delay(100);
 
   Serial.println("Starting OTA updater...");
