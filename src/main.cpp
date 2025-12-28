@@ -14,7 +14,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 // End update
 
 // updated version
-#define VERSION "1.1"
+#define VERSION "1.2"
 
 const char* github_ca_cert = R"EOF(-----BEGIN CERTIFICATE-----
 MIIEoTCCBEigAwIBAgIRAKtmhrVie+gFloITMBKGSfUwCgYIKoZIzj0EAwIwgY8x
@@ -84,7 +84,7 @@ void setup(){
   // Show initial message
   display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(0,0);
+  display.setCursor(SCREEN_WIDTH/2 - 8, SCREEN_HEIGHT/2);
   display.println("Hello User!");
   display.display();
   
@@ -107,9 +107,9 @@ void setup(){
   Serial.println();
   /* displayed on external display*/
   display.clearDisplay();
-  display.setCursor(3,0);
+  display.setCursor(0, SCREEN_HEIGHT/2 - 8);
   display.setTextSize(1);
-  display.println("Connecting to WiFi...");
+  display.println("Connecting to WiFi");
   display.display();
   /* End display */
   
@@ -126,7 +126,7 @@ void setup(){
     Serial.print(".");
     if(millis()-start>30000){ //30s timeout
       display.clearDisplay();
-      display.setCursor(3,0);
+      display.setCursor(0, SCREEN_HEIGHT/2 - 8);
       display.println("WiFi Timeout!");
       display.display();
       Serial.println("\nWiFi connect timeout, restarting...");
@@ -143,6 +143,7 @@ void setup(){
   display.setTextSize(1);
   display.println(WiFi.SSID());
   display.display();
+  delay(2000); // wait for 2 seconds
   Serial.println("\nWiFi connected. IP: "+WiFi.localIP().toString());
   
   Serial.println("Setting Github CA certificate for TLS...");
@@ -155,7 +156,7 @@ void setup(){
   delay(100);
 
   display.clearDisplay();
-  display.setCursor(3,0);
+  display.setCursor(0, SCREEN_HEIGHT/2 - 8);
   display.setTextSize(1);
   display.println("Checking for update");
   display.display();
@@ -179,7 +180,7 @@ void loop(){
   checkForUpdates();
 
   display.clearDisplay();
-  display.setCursor(3,0);
+  display.setCursor(0, SCREEN_HEIGHT/2 - 8);
   display.setTextSize(1);
   display.println("Device Running...");
   display.display();
@@ -195,6 +196,7 @@ void checkForUpdates(){
     display.setTextSize(1);
     display.println("Checking for update");
     display.display();
+    delay(100); // wait for 100 milliseconds
     Serial.println("Checking for updates...");
     if(updater.checkAndUpdate()){
       display.clearDisplay();
@@ -202,6 +204,7 @@ void checkForUpdates(){
       display.setTextSize(1);
       display.println("OTA UPDATE SUCCESSFUL!");
       display.display();
+      delay(2000); // wait for 2 seconds
       Serial.println("OTA UPDATE SUCCESSFUL!");
     } else {
       display.clearDisplay();
@@ -209,6 +212,7 @@ void checkForUpdates(){
       display.setTextSize(1);
       display.println("No update available.");
       display.display();
+      delay(2000); // wait for 2 seconds
       Serial.println("No update available.");
     }
   }
