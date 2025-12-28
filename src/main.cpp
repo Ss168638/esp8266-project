@@ -13,7 +13,7 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 // End update
 
-#define VERSION "1.0.6"
+#define VERSION "1.0.7"
 
 const char* github_ca_cert = R"EOF(-----BEGIN CERTIFICATE-----
 MIIEoTCCBEigAwIBAgIRAKtmhrVie+gFloITMBKGSfUwCgYIKoZIzj0EAwIwgY8x
@@ -104,6 +104,15 @@ void setup(){
   Serial.begin(115200);
   delay(200);
   Serial.println();
+  /* displayed on external display*/
+  display.clearDisplay();
+  display.setCursor(3,0);
+  display.setTextSize(1);
+  display.println("Connecting to WiFi...");
+  display.display();
+  /* End display */
+  
+  // displayed on serial monitor
   Serial.println("Connecting to WiFi...");
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -112,6 +121,10 @@ void setup(){
   while(WiFi.status()!=WL_CONNECTED){
     Serial.print(".");
     if(millis()-start>30000){ //30s timeout
+      display.clearDisplay();
+      display.setCursor(3,0);
+      display.println("WiFi Timeout!");
+      display.display();
       Serial.println("\nWiFi connect timeout, restarting...");
       delay(1000);
       ESP.restart();
@@ -119,6 +132,13 @@ void setup(){
     delay(300);
   } 
 
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.setTextSize(2);
+  display.println("WiFi Connected!");
+  display.setTextSize(1);
+  display.println(WiFi.SSID());
+  display.display();
   Serial.println("\nWiFi connected. IP: "+WiFi.localIP().toString());
   
   Serial.println("Setting Github CA certificate for TLS...");
@@ -130,6 +150,11 @@ void setup(){
   updater.setCurrentVersion(VERSION);
   delay(100);
 
+  display.clearDisplay();
+  display.setCursor(3,0);
+  display.setTextSize(1);
+  display.println("Checking for update");
+  display.display();
   Serial.println("Starting OTA updater...");
   // updater.beginClient();
   if(updater.checkAndUpdate()){
@@ -148,6 +173,12 @@ void loop(){
 
 // Check for updates every interval
   checkForUpdates();
+
+  display.clearDisplay();
+  display.setCursor(3,0);
+  display.setTextSize(1);
+  display.println("Device Running...");
+  display.display();
 }
 
 // This function checks for updates at regular intervals 60 seconds
@@ -155,10 +186,25 @@ void checkForUpdates(){
   unsigned long currentMillis = millis();
   if(currentMillis - previousMillis >= interval){
     previousMillis = currentMillis;
+    display.clearDisplay();
+    display.setCursor(3,0);
+    display.setTextSize(1);
+    display.println("Checking for update");
+    display.display();
     Serial.println("Checking for updates...");
     if(updater.checkAndUpdate()){
+      display.clearDisplay();
+      display.setCursor(3,0);
+      display.setTextSize(1);
+      display.println("OTA UPDATE SUCCESSFUL!");
+      display.display();
       Serial.println("OTA UPDATE SUCCESSFUL!");
     } else {
+      display.clearDisplay();
+      display.setCursor(3,0);
+      display.setTextSize(1);
+      display.println("No update available.");
+      display.display();
       Serial.println("No update available.");
     }
   }
