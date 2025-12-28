@@ -120,6 +120,9 @@ void setup(){
 
   unsigned long start = millis();
   while(WiFi.status()!=WL_CONNECTED){
+    display.setCursor(0,20);
+    display.println(".");
+    display.display();
     Serial.print(".");
     if(millis()-start>30000){ //30s timeout
       display.clearDisplay();
