@@ -3,6 +3,16 @@
 #include <OTAUpdater.h>
 // #include <secrets.h> //Uncomment when flashing locally with secrets
 
+// Update 28-Dec-2025
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+// End update
+
 #define VERSION "1.0.5"
 
 const char* github_ca_cert = R"EOF(-----BEGIN CERTIFICATE-----
@@ -63,6 +73,33 @@ void setup(){
 
   // Initialize the digital pin as an output
   pinMode(ledPin, OUTPUT);
+
+  // Update 28-Dec-2025
+  // Initialize for Display
+  Wire.begin(D2, D1); // SDA, SCL
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+
+  // Show initial message
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(0,0);
+  display.println("Hello User!");
+  display.display();
+  
+  delay(2000); // wait for 2 seconds
+
+  // show version details
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.setTextSize(2);
+  display.println("App Info"); 
+  display.setTextSize(1);
+  display.println();
+  display.println("Version: " + String(VERSION));
+  display.display();
+  delay(2000); // wait for 2 seconds
+  //End Update
 
   Serial.begin(115200);
   delay(200);
