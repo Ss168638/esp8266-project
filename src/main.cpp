@@ -13,6 +13,7 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 // End update
 
+// updated version
 #define VERSION "1.1"
 
 const char* github_ca_cert = R"EOF(-----BEGIN CERTIFICATE-----
