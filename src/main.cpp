@@ -14,7 +14,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 // End update
 
 // updated version
-#define VERSION "1.2"
+#define VERSION "1.3"
 
 const char* github_ca_cert = R"EOF(-----BEGIN CERTIFICATE-----
 MIIEoTCCBEigAwIBAgIRAKtmhrVie+gFloITMBKGSfUwCgYIKoZIzj0EAwIwgY8x
@@ -69,6 +69,7 @@ unsigned long interval = 60000; // check for update every 60 seconds
 static unsigned long previousMillis = 0;
 //Function prototypes
 void checkForUpdates();
+void flashProgress(size_t written, size_t total);
 
 void setup(){
 
@@ -82,9 +83,9 @@ void setup(){
   display.clearDisplay();
 
   // Show initial message
-  display.setTextSize(2);
+  display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.setCursor(SCREEN_WIDTH/2 - 8, SCREEN_HEIGHT/2);
+  display.setCursor(0, SCREEN_HEIGHT/2);
   display.println("Hello User!");
   display.display();
   
@@ -92,9 +93,9 @@ void setup(){
 
   // show version details
   display.clearDisplay();
-  display.setCursor(0,0);
+  display.setCursor(SCREEN_WIDTH/2-10,3);
   display.setTextSize(2);
-  display.println("App Info"); 
+  display.println("App Info:\n"); 
   display.setTextSize(1);
   display.println();
   display.println("Version: " + String(VERSION));
@@ -107,9 +108,9 @@ void setup(){
   Serial.println();
   /* displayed on external display*/
   display.clearDisplay();
-  display.setCursor(0, SCREEN_HEIGHT/2 - 8);
+  display.setCursor(1, 0);
   display.setTextSize(1);
-  display.println("Connecting to WiFi");
+  display.println("Connecting to WiFi...");
   display.display();
   /* End display */
   
@@ -119,15 +120,18 @@ void setup(){
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long start = millis();
+  unsigned char offset = 10;
   while(WiFi.status()!=WL_CONNECTED){
-    display.setCursor(0,20);
+    if (offset <= 5) offset = 10;
+    display.setCursor(SCREEN_WIDTH/2-offset, SCREEN_HEIGHT/2);
     display.println(".");
     display.display();
+    offset -= 1;
     Serial.print(".");
     if(millis()-start>30000){ //30s timeout
       display.clearDisplay();
-      display.setCursor(0, SCREEN_HEIGHT/2 - 8);
-      display.println("WiFi Timeout!");
+      display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
+      display.println("WiFi Timeout!\n Restarting...");
       display.display();
       Serial.println("\nWiFi connect timeout, restarting...");
       delay(1000);
@@ -137,10 +141,11 @@ void setup(){
   } 
 
   display.clearDisplay();
-  display.setCursor(0,0);
-  display.setTextSize(2);
-  display.println("WiFi Connected!");
+  display.setCursor(SCREEN_WIDTH/2-10,SCREEN_HEIGHT/2);
   display.setTextSize(1);
+  display.println("WiFi Connected to \n");
+  display.setTextSize(1);
+  display.setCursor(SCREEN_WIDTH/2-5, SCREEN_HEIGHT/2+5);
   display.println(WiFi.SSID());
   display.display();
   delay(2000); // wait for 2 seconds
@@ -149,6 +154,7 @@ void setup(){
   Serial.println("Setting Github CA certificate for TLS...");
   // updater.setCAcert(github_ca_cert);
 
+  updater.setProgressCallback(flashProgress);
   updater.setUrls(VERSION_URL,FIRMWARE_URL);
   delay(100);
   Serial.println("Setting current version...");
@@ -156,7 +162,7 @@ void setup(){
   delay(100);
 
   display.clearDisplay();
-  display.setCursor(0, SCREEN_HEIGHT/2 - 8);
+  display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
   display.setTextSize(1);
   display.println("Checking for update");
   display.display();
@@ -179,11 +185,16 @@ void loop(){
 // Check for updates every interval
   checkForUpdates();
 
+  static const unsigned char PROGMEM smiley_bmp[] =
+  { 0x3C,0x42,0xA5,0x81,0xA5,0x99,0x42,0x3C };
+
   display.clearDisplay();
-  display.setCursor(0, SCREEN_HEIGHT/2 - 8);
-  display.setTextSize(1);
-  display.println("Device Running...");
+  display.drawBitmap(56, 16, smiley_bmp, 8, 8, 1);
+  display.setCursor(20, 40);
+  display.println("Running...");
   display.display();
+  delay(2000); // wait for 2 seconds
+
 }
 
 // This function checks for updates at regular intervals 60 seconds
@@ -192,7 +203,7 @@ void checkForUpdates(){
   if(currentMillis - previousMillis >= interval){
     previousMillis = currentMillis;
     display.clearDisplay();
-    display.setCursor(3,0);
+    display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
     display.setTextSize(1);
     display.println("Checking for update");
     display.display();
@@ -200,7 +211,7 @@ void checkForUpdates(){
     Serial.println("Checking for updates...");
     if(updater.checkAndUpdate()){
       display.clearDisplay();
-      display.setCursor(3,0);
+      display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
       display.setTextSize(1);
       display.println("OTA UPDATE SUCCESSFUL!");
       display.display();
@@ -208,7 +219,7 @@ void checkForUpdates(){
       Serial.println("OTA UPDATE SUCCESSFUL!");
     } else {
       display.clearDisplay();
-      display.setCursor(3,0);
+      display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
       display.setTextSize(1);
       display.println("No update available.");
       display.display();
@@ -216,4 +227,14 @@ void checkForUpdates(){
       Serial.println("No update available.");
     }
   }
+}
+
+void flashProgress(size_t written, size_t total)
+{
+  display.clearDisplay();
+  display.setCursor(0, SCREEN_HEIGHT/2); 
+  display.setTextSize(1);
+  int percent = (total > 0) ? (written * 100 / total) : 0;
+  display.printf("Flashing: %d%% (%d/%d bytes)", percent, (int)written, (int)total);
+  display.display();
 }

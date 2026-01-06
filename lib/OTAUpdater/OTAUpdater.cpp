@@ -209,4 +209,8 @@ bool OTAUpdater::_downloadAndFlash(const char* url) {
 void OTAUpdater::flashProgress(size_t written, size_t total) {
     int percent = (total > 0) ? (written * 100 / total) : 0;
     Serial.printf("\rFlashing: %d%% (%d/%d bytes)", percent, (int)written, (int)total);
+
+    if (_progressCb) {
+        _progressCb(written, total);
+    }
 }
