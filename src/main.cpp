@@ -14,7 +14,7 @@
 /*******************************End of Include Files*****************************/
 
 /*******************************Macro Definitions********************************/ 
-#define VERSION "1.5" //Current firmware version
+#define VERSION "1.6" //Current firmware version
 
 #define LED_INTERVAL        1000     // 1 sec
 #define OTA_INTERVAL        60000    // 60 sec
@@ -370,7 +370,7 @@ void drawHeartRate() {
   display.print("Heart Monitor");
 
   display.setTextSize(1);
-  display.setCursor(20, 28);
+  display.setCursor(28, 28);
 
   if (FingerPresent && BPM > 30 && BPM < 200) {
     display.printf("HR %d", BPM);
