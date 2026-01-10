@@ -14,11 +14,11 @@
 /*******************************End of Include Files*****************************/
 
 /*******************************Macro Definitions********************************/ 
-#define VERSION "1.4" //Current firmware version
+#define VERSION "1.5" //Current firmware version
 
 #define LED_INTERVAL        1000     // 1 sec
 #define OTA_INTERVAL        60000    // 60 sec
-#define DISPLAY_INTERVAL    500     // 0.5 sec
+#define DISPLAY_INTERVAL    100     // 0.1 sec
 
   /* OLED display config */
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -141,11 +141,7 @@ void setup() {
   display.clearDisplay();
   display.display();
 
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, SCREEN_HEIGHT / 2);
-  display.println("Hello User!");
-  display.display();
+  printCentered("Hello User!");
 
   delay(1500);
 
@@ -299,7 +295,7 @@ void printCentered(const char* text) {
   int16_t x1, y1;
   uint16_t w, h;
 
-  display.setTextSize(2);
+  display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
 
   // Get pixel size of text
@@ -373,7 +369,7 @@ void drawHeartRate() {
   display.setCursor(28, 6);
   display.print("Heart Monitor");
 
-  display.setTextSize(2);
+  display.setTextSize(1);
   display.setCursor(20, 28);
 
   if (FingerPresent && BPM > 30 && BPM < 200) {
