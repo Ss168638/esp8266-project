@@ -111,7 +111,7 @@ OTAUpdater Updater; // OTA updater object
   void checkForUpdates();
   void flashProgress(size_t written, size_t total);
   void printCentered(const char* text);
-  void drawProgressBar(int value);
+  void drawProgressBar(int value, char const* text);
   void readHeartRate();
   void drawHeartRate();
 
