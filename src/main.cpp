@@ -2,239 +2,385 @@
 #include <ESP8266WiFi.h>
 #include <OTAUpdater.h>
 // #include <secrets.h> //Uncomment when flashing locally with secrets
+#include <MAX30105.h>
+#include <heartRate.h>
 
 // Update 28-Dec-2025
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+
+/*******************************End of Include Files*****************************/
+
+/*******************************Macro Definitions********************************/ 
+#define VERSION "1.4" //Current firmware version
+
+#define LED_INTERVAL        1000     // 1 sec
+#define OTA_INTERVAL        60000    // 60 sec
+#define DISPLAY_INTERVAL    500     // 0.5 sec
+
+  /* OLED display config */
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-// End update
 
-// updated version
-#define VERSION "1.3"
+/* Progress bar config */
+#define BAR_WIDTH  100  // Width of the progress bar in pixels
+#define BAR_HEIGHT 8  // Height of the progress bar in pixels
 
-const char* github_ca_cert = R"EOF(-----BEGIN CERTIFICATE-----
-MIIEoTCCBEigAwIBAgIRAKtmhrVie+gFloITMBKGSfUwCgYIKoZIzj0EAwIwgY8x
-CzAJBgNVBAYTAkdCMRswGQYDVQQIExJHcmVhdGVyIE1hbmNoZXN0ZXIxEDAOBgNV
-BAcTB1NhbGZvcmQxGDAWBgNVBAoTD1NlY3RpZ28gTGltaXRlZDE3MDUGA1UEAxMu
-U2VjdGlnbyBFQ0MgRG9tYWluIFZhbGlkYXRpb24gU2VjdXJlIFNlcnZlciBDQTAe
-Fw0yNTAyMDUwMDAwMDBaFw0yNjAyMDUyMzU5NTlaMBUxEzARBgNVBAMTCmdpdGh1
-Yi5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQgNFxG/yzL+CSarvC7L3ep
-H5chNnG6wiYYxR5D/Z1J4MxGnIX8KbT5fCgLoyzHXL9v50bdBIq6y4AtN4gN7gbW
-o4IC/DCCAvgwHwYDVR0jBBgwFoAU9oUKOxGG4QR9DqoLLNLuzGR7e64wHQYDVR0O
-BBYEFFPIf96emE7HTda83quVPjA9PdHIMA4GA1UdDwEB/wQEAwIHgDAMBgNVHRMB
-Af8EAjAAMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjBJBgNVHSAEQjBA
-MDQGCysGAQQBsjEBAgIHMCUwIwYIKwYBBQUHAgEWF2h0dHBzOi8vc2VjdGlnby5j
-b20vQ1BTMAgGBmeBDAECATCBhAYIKwYBBQUHAQEEeDB2ME8GCCsGAQUFBzAChkNo
-dHRwOi8vY3J0LnNlY3RpZ28uY29tL1NlY3RpZ29FQ0NEb21haW5WYWxpZGF0aW9u
-U2VjdXJlU2VydmVyQ0EuY3J0MCMGCCsGAQUFBzABhhdodHRwOi8vb2NzcC5zZWN0
-aWdvLmNvbTCCAX4GCisGAQQB1nkCBAIEggFuBIIBagFoAHUAlpdkv1VYl633Q4do
-NwhCd+nwOtX2pPM2bkakPw/KqcYAAAGU02uUSwAABAMARjBEAiA7i6o+LpQjt6Ae
-EjltHhs/TiECnHd0xTeer/3vD1xgsAIgYlGwRot+SqEBCs//frx/YHTPwox9QLdy
-7GjTLWHfcMAAdwAZhtTHKKpv/roDb3gqTQGRqs4tcjEPrs5dcEEtJUzH1AAAAZTT
-a5PtAAAEAwBIMEYCIQDlrInx7J+3MfqgxB2+Fvq3dMlk1qj4chOw/+HkYVfG0AIh
-AMT+JKAQfUuIdBGxfryrGrwsOD3pRs1tyAyykdPGRgsTAHYAyzj3FYl8hKFEX1vB
-3fvJbvKaWc1HCmkFhbDLFMMUWOcAAAGU02uUJQAABAMARzBFAiEA1GKW92agDFNJ
-IYrMH3gaJdXsdIVpUcZOfxH1FksbuLECIFJCfslINhc53Q0TIMJHdcFOW2tgG4tB
-A1dL881tXbMnMCUGA1UdEQQeMByCCmdpdGh1Yi5jb22CDnd3dy5naXRodWIuY29t
-MAoGCCqGSM49BAMCA0cAMEQCIHGMp27BBBJ1356lCe2WYyzYIp/fAONQM3AkeE/f
-ym0sAiBtVfN3YgIZ+neHEfwcRhhz4uDpc8F+tKmtceWJSicMkA==
------END CERTIFICATE-----)EOF";
+/******************************End of Macro Definitions*************************/
 
-// WiFi credentials defined in platformio_local.ini for security
-#ifndef WIFI_SSID
-  #error "WIFI_SSID not defined — CI did not inject the secret!"
-#endif
+/*******************************Global Variables********************************/
+uint32_t LastBeat = 0;
+int BPM = 0;
+bool FingerPresent = false;
+unsigned long LastDisplayUpdate = 0;
+unsigned long LastUpdate = 0;
+int Progress = 0;
+const int ledPin = LED_BUILTIN; // On-board LED pin for ESP8266 GPIO2
+unsigned long Interval_60_second = 60000; // check for update every 60 seconds
+static unsigned long PreviousMillis = 0; // Stores last time update checked
+unsigned long LastLedToggle = 0;
+unsigned long LastOtaCheck = 0;
 
-#ifndef WIFI_PASSWORD
-  #error "WIFI_PASSWORD not defined — CI did not inject the secret!"
-#endif
+bool ledState = false;
 
-// Change this pin depending on your board:
-// - Arduino Uno: 13
-// - ESP8266 NodeMCU: LED_BUILTIN (usually GPIO2)
-// - ESP32: LED_BUILTIN (usually GPIO2)
-const int ledPin = LED_BUILTIN;
+/******************************End of Global Variables**************************/
 
+
+
+/*******************************Constant Definitions*****************************/
 // Set the link to version.json and firmware.bin
 const char* VERSION_URL="https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/version.json";
 const char* FIRMWARE_URL="https://raw.githubusercontent.com/Ss168638/esp8266-project/main/firmware/firmware.bin?raw=1";
 
-OTAUpdater updater;
+/****************************End of Constant Definitions*************************/
 
-unsigned long interval = 60000; // check for update every 60 seconds
-static unsigned long previousMillis = 0;
-//Function prototypes
-void checkForUpdates();
-void flashProgress(size_t written, size_t total);
 
-void setup(){
+/******************************Object Definitions*******************************/
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // OLED display object
+MAX30105 ParticleSensor; // Heart rate sensor object
+OTAUpdater Updater; // OTA updater object
 
-  // Initialize the digital pin as an output
-  pinMode(ledPin, OUTPUT);
 
-  // Update 28-Dec-2025
-  // Initialize for Display
-  Wire.begin(D2, D1); // SDA, SCL
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.clearDisplay();
+/****************************End of Object Definitions**************************/
 
-  // Show initial message
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0, SCREEN_HEIGHT/2);
-  display.println("Hello User!");
-  display.display();
+
+/*******************************Certificate Strings*****************************/
+// const char* github_ca_cert = R"EOF(-----BEGIN CERTIFICATE-----
+// MIIEoTCCBEigAwIBAgIRAKtmhrVie+gFloITMBKGSfUwCgYIKoZIzj0EAwIwgY8x
+// CzAJBgNVBAYTAkdCMRswGQYDVQQIExJHcmVhdGVyIE1hbmNoZXN0ZXIxEDAOBgNV
+// BAcTB1NhbGZvcmQxGDAWBgNVBAoTD1NlY3RpZ28gTGltaXRlZDE3MDUGA1UEAxMu
+// U2VjdGlnbyBFQ0MgRG9tYWluIFZhbGlkYXRpb24gU2VjdXJlIFNlcnZlciBDQTAe
+// Fw0yNTAyMDUwMDAwMDBaFw0yNjAyMDUyMzU5NTlaMBUxEzARBgNVBAMTCmdpdGh1
+// Yi5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQgNFxG/yzL+CSarvC7L3ep
+// H5chNnG6wiYYxR5D/Z1J4MxGnIX8KbT5fCgLoyzHXL9v50bdBIq6y4AtN4gN7gbW
+// o4IC/DCCAvgwHwYDVR0jBBgwFoAU9oUKOxGG4QR9DqoLLNLuzGR7e64wHQYDVR0O
+// BBYEFFPIf96emE7HTda83quVPjA9PdHIMA4GA1UdDwEB/wQEAwIHgDAMBgNVHRMB
+// Af8EAjAAMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjBJBgNVHSAEQjBA
+// MDQGCysGAQQBsjEBAgIHMCUwIwYIKwYBBQUHAgEWF2h0dHBzOi8vc2VjdGlnby5j
+// b20vQ1BTMAgGBmeBDAECATCBhAYIKwYBBQUHAQEEeDB2ME8GCCsGAQUFBzAChkNo
+// dHRwOi8vY3J0LnNlY3RpZ28uY29tL1NlY3RpZ29FQ0NEb21haW5WYWxpZGF0aW9u
+// U2VjdXJlU2VydmVyQ0EuY3J0MCMGCCsGAQUFBzABhhdodHRwOi8vb2NzcC5zZWN0
+// aWdvLmNvbTCCAX4GCisGAQQB1nkCBAIEggFuBIIBagFoAHUAlpdkv1VYl633Q4do
+// NwhCd+nwOtX2pPM2bkakPw/KqcYAAAGU02uUSwAABAMARjBEAiA7i6o+LpQjt6Ae
+// EjltHhs/TiECnHd0xTeer/3vD1xgsAIgYlGwRot+SqEBCs//frx/YHTPwox9QLdy
+// 7GjTLWHfcMAAdwAZhtTHKKpv/roDb3gqTQGRqs4tcjEPrs5dcEEtJUzH1AAAAZTT
+// a5PtAAAEAwBIMEYCIQDlrInx7J+3MfqgxB2+Fvq3dMlk1qj4chOw/+HkYVfG0AIh
+// AMT+JKAQfUuIdBGxfryrGrwsOD3pRs1tyAyykdPGRgsTAHYAyzj3FYl8hKFEX1vB
+// 3fvJbvKaWc1HCmkFhbDLFMMUWOcAAAGU02uUJQAABAMARzBFAiEA1GKW92agDFNJ
+// IYrMH3gaJdXsdIVpUcZOfxH1FksbuLECIFJCfslINhc53Q0TIMJHdcFOW2tgG4tB
+// A1dL881tXbMnMCUGA1UdEQQeMByCCmdpdGh1Yi5jb22CDnd3dy5naXRodWIuY29t
+// MAoGCCqGSM49BAMCA0cAMEQCIHGMp27BBBJ1356lCe2WYyzYIp/fAONQM3AkeE/f
+// ym0sAiBtVfN3YgIZ+neHEfwcRhhz4uDpc8F+tKmtceWJSicMkA==
+// -----END CERTIFICATE-----)EOF";
+
+/****************************End of Certificate Strings*************************/
+
+
+// WiFi credentials defined in platformio_local.ini for security
+#ifndef WIFI_SSID
+  #error "WIFI_SSID not defined — CI did not inject the secret!"
+  #endif
   
-  delay(2000); // wait for 2 seconds
+  #ifndef WIFI_PASSWORD
+  #error "WIFI_PASSWORD not defined — CI did not inject the secret!"
+  #endif
+  
+  /*******************************Function Prototypes*****************************/
+  void checkForUpdates();
+  void flashProgress(size_t written, size_t total);
+  void printCentered(const char* text);
+  void drawProgressBar(int value);
+  void readHeartRate();
+  void drawHeartRate();
 
-  // show version details
-  display.clearDisplay();
-  display.setCursor(SCREEN_WIDTH/2-10,3);
-  display.setTextSize(2);
-  display.println("App Info:\n"); 
-  display.setTextSize(1);
-  display.println();
-  display.println("Version: " + String(VERSION));
-  display.display();
-  delay(2000); // wait for 2 seconds
-  //End Update
+  /****************************End of Function Prototypes**************************/
 
+
+
+void setup() {
+
+  /* ---------- Serial FIRST ---------- */
   Serial.begin(115200);
   delay(200);
-  Serial.println();
-  /* displayed on external display*/
+  Serial.println("\nBooting...");
+
+  /* ---------- GPIO ---------- */
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+
+  /* ---------- I2C (OLED + MAX3010x) ---------- */
+  Wire.begin(D2, D1); // SDA, SCL
+
+  /* ---------- Display ---------- */
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("SSD1306 not found");
+    ESP.restart();
+  }
   display.clearDisplay();
-  display.setCursor(1, 0);
-  display.setTextSize(1);
-  display.println("Connecting to WiFi...");
   display.display();
-  /* End display */
-  
-  // displayed on serial monitor
+
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, SCREEN_HEIGHT / 2);
+  display.println("Hello User!");
+  display.display();
+
+  delay(1500);
+
+  /* ---------- MAX3010x ---------- */
+  if (!ParticleSensor.begin(Wire, I2C_SPEED_FAST)) {
+    Serial.println("MAX3010x not found, restarting...");
+    delay(1000);
+    ESP.restart();
+  }
+
+  ParticleSensor.setup();
+  ParticleSensor.setPulseAmplitudeRed(0x1F);
+  ParticleSensor.setPulseAmplitudeIR(0x1F);
+  ParticleSensor.setPulseAmplitudeGreen(0);
+
+  Serial.println("MAX3010x initialized");
+
+  /* ---------- Version Info ---------- */
+  String versionInfo = "Current Version: " + String(VERSION);
+  printCentered(versionInfo.c_str());
+  delay(1500);
+
+  /* ---------- WiFi ---------- */
+  printCentered("Connecting to WiFi");
   Serial.println("Connecting to WiFi...");
+
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long start = millis();
-  unsigned char offset = 10;
-  while(WiFi.status()!=WL_CONNECTED){
-    if (offset <= 5) offset = 10;
-    display.setCursor(SCREEN_WIDTH/2-offset, SCREEN_HEIGHT/2);
-    display.println(".");
-    display.display();
-    offset -= 1;
-    Serial.print(".");
-    if(millis()-start>30000){ //30s timeout
-      display.clearDisplay();
-      display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
-      display.println("WiFi Timeout!\n Restarting...");
-      display.display();
-      Serial.println("\nWiFi connect timeout, restarting...");
+  Progress = 0;
+  LastUpdate = 0;
+
+  const char* text = "Connecting to WiFi";
+
+  while (WiFi.status() != WL_CONNECTED) {
+    unsigned long now = millis();
+
+    if (now - LastUpdate > 80) {
+      LastUpdate = now;
+      Progress += 2;
+      if (Progress > 100) Progress = 0;
+      drawProgressBar(Progress, text);
+    }
+
+    if (now - start > 30000) {
+      printCentered("WiFi Timeout!\nRestarting...");
+      Serial.println("WiFi timeout, restarting...");
       delay(1000);
       ESP.restart();
     }
-    delay(300);
-  } 
 
-  display.clearDisplay();
-  display.setCursor(SCREEN_WIDTH/2-10,SCREEN_HEIGHT/2);
-  display.setTextSize(1);
-  display.println("WiFi Connected to \n");
-  display.setTextSize(1);
-  display.setCursor(SCREEN_WIDTH/2-5, SCREEN_HEIGHT/2+5);
-  display.println(WiFi.SSID());
-  display.display();
-  delay(2000); // wait for 2 seconds
-  Serial.println("\nWiFi connected. IP: "+WiFi.localIP().toString());
-  
-  Serial.println("Setting Github CA certificate for TLS...");
-  // updater.setCAcert(github_ca_cert);
-
-  updater.setProgressCallback(flashProgress);
-  updater.setUrls(VERSION_URL,FIRMWARE_URL);
-  delay(100);
-  Serial.println("Setting current version...");
-  updater.setCurrentVersion(VERSION);
-  delay(100);
-
-  display.clearDisplay();
-  display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
-  display.setTextSize(1);
-  display.println("Checking for update");
-  display.display();
-  Serial.println("Starting OTA updater...");
-  // updater.beginClient();
-  if(updater.checkAndUpdate()){
-    Serial.println("OTA UPDATE SUCCESSFUL!");
+    yield(); // VERY IMPORTANT for ESP8266
   }
-  previousMillis = millis();
+
+  String wifi_ssid = "WiFi Connected";
+  printCentered(wifi_ssid.c_str());
+  Serial.println("WiFi connected. IP: " + WiFi.localIP().toString());
+  delay(1500);
+
+  /* ---------- OTA Updater ---------- */
+  Serial.println("Initializing OTA updater");
+
+  //Updater.setCAcert(github_ca_cert);
+  // Updater.beginClient();
+  Updater.setProgressCallback(flashProgress);
+  Updater.setUrls(VERSION_URL, FIRMWARE_URL);
+  Updater.setCurrentVersion(VERSION);
+
+  printCentered("Checking for update");
+  Serial.println("Checking for OTA update...");
+
+  if (Updater.checkAndUpdate()) {
+    printCentered("OTA UPDATE SUCCESS");
+    Serial.println("OTA UPDATE SUCCESS");
+  }
+
+  PreviousMillis = millis();
 }
-void loop(){
-  //Other functionality can go here
-  Serial.println("LED ON");
-  digitalWrite(ledPin, HIGH);   // turn the LED on
-  delay(1000);                  // wait for 1 second
-  Serial.println("LED OFF");
-  digitalWrite(ledPin, LOW);    // turn the LED off
-  delay(1000);                  // wait for 1 second
 
-// Check for updates every interval
-  checkForUpdates();
 
-  static const unsigned char PROGMEM smiley_bmp[] =
-  { 0x3C,0x42,0xA5,0x81,0xA5,0x99,0x42,0x3C };
 
-  display.clearDisplay();
-  display.drawBitmap(56, 16, smiley_bmp, 8, 8, 1);
-  display.setCursor(20, 40);
-  display.println("Running...");
-  display.display();
-  delay(2000); // wait for 2 seconds
+void loop() {
 
+  unsigned long now = millis();
+
+  /* ---------------- LED BLINK (non-blocking) ---------------- */
+  if (now - LastLedToggle >= LED_INTERVAL) {
+    LastLedToggle = now;
+    ledState = !ledState;
+
+    digitalWrite(ledPin, ledState);
+    Serial.println(ledState ? "LED ON" : "LED OFF");
+  }
+
+  /* ---------------- OTA CHECK (timed) ---------------- */
+  if (now - LastOtaCheck >= OTA_INTERVAL) {
+    LastOtaCheck = now;
+    checkForUpdates();
+  }
+
+  /* ---------------- HEART RATE READ (continuous) ---------------- */
+  readHeartRate();   // MUST be called frequently (no delay)
+
+  /* ---------------- OLED UPDATE (throttled) ---------------- */
+  if (now - LastDisplayUpdate >= DISPLAY_INTERVAL) {
+    LastDisplayUpdate = now;
+    drawHeartRate();
+  }
 }
 
-// This function checks for updates at regular intervals 60 seconds
+
+// This function checks for updates at regular Interval_60_seconds 60 seconds
 void checkForUpdates(){
   unsigned long currentMillis = millis();
-  if(currentMillis - previousMillis >= interval){
-    previousMillis = currentMillis;
-    display.clearDisplay();
-    display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
-    display.setTextSize(1);
-    display.println("Checking for update");
-    display.display();
+  if(currentMillis - PreviousMillis >= Interval_60_second){
+    PreviousMillis = currentMillis;
+    printCentered("Checking for update");
     delay(100); // wait for 100 milliseconds
     Serial.println("Checking for updates...");
-    if(updater.checkAndUpdate()){
-      display.clearDisplay();
-      display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
-      display.setTextSize(1);
-      display.println("OTA UPDATE SUCCESSFUL!");
-      display.display();
+    if(Updater.checkAndUpdate()){
+      printCentered("OTA UPDATE SUCCESSFUL!");
       delay(2000); // wait for 2 seconds
       Serial.println("OTA UPDATE SUCCESSFUL!");
     } else {
-      display.clearDisplay();
-      display.setCursor(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2);
-      display.setTextSize(1);
-      display.println("No update available.");
-      display.display();
+      printCentered("No update available.");
       delay(2000); // wait for 2 seconds
       Serial.println("No update available.");
     }
   }
 }
 
+// This function is called during the flashing process to show progress
 void flashProgress(size_t written, size_t total)
 {
+  if (total == 0) return;
+
+  int percent = (written * 100) / total;
+
+  // Optional: throttle display updates (recommended for OTA)
+  static unsigned long lastDraw = 0;
+  if (millis() - lastDraw < 150) return;
+  lastDraw = millis();
+
+  drawProgressBar(percent, "Flashing firmware");
+}
+
+// This function prints centered text on the OLED display
+void printCentered(const char* text) {
+
+  int16_t x1, y1;
+  uint16_t w, h;
+
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+
+  // Get pixel size of text
+  display.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+
+  // Calculate center position
+  int16_t x = (SCREEN_WIDTH  - w) / 2;
+  int16_t y = (SCREEN_HEIGHT - h) / 2;
+
   display.clearDisplay();
-  display.setCursor(0, SCREEN_HEIGHT/2); 
+  display.setCursor(x, y);
+  display.print(text);
+  display.display();
+}
+
+// This function draws a progress bar on the OLED display
+void drawProgressBar(int value, char const* text) {
+  display.clearDisplay();
   display.setTextSize(1);
-  int percent = (total > 0) ? (written * 100 / total) : 0;
-  display.printf("Flashing: %d%% (%d/%d bytes)", percent, (int)written, (int)total);
+  display.setTextColor(SSD1306_WHITE);
+
+  // ---- Center text ----
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+
+  int textX = (SCREEN_WIDTH - w) / 2;
+  int textY = 18;
+
+  display.setCursor(textX, textY);
+  display.print(text);
+
+  // ---- Center Progress bar ----
+  int barX = (SCREEN_WIDTH - BAR_WIDTH) / 2;
+  int barY = textY + 14;
+
+  display.drawRect(barX, barY, BAR_WIDTH, BAR_HEIGHT, SSD1306_WHITE);
+
+  int fillWidth = map(value, 0, 100, 0, BAR_WIDTH - 2);
+  display.fillRect(barX + 1, barY + 1, fillWidth, BAR_HEIGHT - 2, SSD1306_WHITE);
+
+  display.display();
+}
+
+// This function reads heart rate data from the sensor
+void readHeartRate() {
+  long irValue = ParticleSensor.getIR();
+
+  if (irValue > 50000) {  // finger detected
+    FingerPresent = true;
+
+    if (checkForBeat(irValue)) {
+      uint32_t now = millis();
+      uint32_t delta = now - LastBeat;
+      LastBeat = now;
+
+      BPM = 60 / (delta / 1000.0);
+    }
+  } else {
+    FingerPresent = false;
+    BPM = 0;
+  }
+}
+
+// This function draws heart rate information on the OLED display
+void drawHeartRate() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(28, 6);
+  display.print("Heart Monitor");
+
+  display.setTextSize(2);
+  display.setCursor(20, 28);
+
+  if (FingerPresent && BPM > 30 && BPM < 200) {
+    display.printf("HR %d", BPM);
+  } else {
+    display.print("Place finger");
+  }
+
   display.display();
 }
