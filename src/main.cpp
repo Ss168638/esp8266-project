@@ -27,6 +27,7 @@
 /* Progress bar config */
 #define BAR_WIDTH  100  // Width of the progress bar in pixels
 #define BAR_HEIGHT 8  // Height of the progress bar in pixels
+#define PULSE_GRAPH_LENGTH  (SCREEN_WIDTH - 20) // Roughly 100 pixels wide
 
 /******************************End of Macro Definitions*************************/
 
@@ -44,6 +45,12 @@ unsigned long LastLedToggle = 0;
 unsigned long LastOtaCheck = 0;
 
 bool ledState = false;
+
+#define BPM_SAMPLE_SIZE 4 // Number of samples for rolling average
+uint32_t beat_deltas[BPM_SAMPLE_SIZE];
+int delta_index = 0;
+uint16_t ir_history[PULSE_GRAPH_LENGTH];
+int ir_history_index = 0;
 
 /******************************End of Global Variables**************************/
 
@@ -352,7 +359,16 @@ void readHeartRate() {
       uint32_t delta = now - LastBeat;
       LastBeat = now;
 
-      BPM = 60 / (delta / 1000.0);
+      // Add new delta to rolling average
+      beat_deltas[delta_index] = delta;
+      delta_index = (delta_index + 1) % BPM_SAMPLE_SIZE;
+
+      // Calculate average BPM from stored deltas
+      uint32_t sum_deltas = 0;
+      for (int i = 0; i < BPM_SAMPLE_SIZE; i++) {
+        sum_deltas += beat_deltas[i];
+      }
+      BPM = 60 / ((sum_deltas / BPM_SAMPLE_SIZE) / 1000.0);
     }
   } else {
     FingerPresent = false;
@@ -366,17 +382,29 @@ void drawHeartRate() {
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
 
-  display.setCursor(28, 6);
+  // Display Heart Monitor title
+  display.setCursor(28, 0);
   display.print("Heart Monitor");
 
-  display.setTextSize(1);
-  display.setCursor(28, 28);
-
+  // Display BPM or "Place finger"
+  display.setCursor(48, 16);
   if (FingerPresent && BPM > 30 && BPM < 200) {
     display.printf("HR %d", BPM);
   } else {
     display.print("Place finger");
   }
 
+  // Draw pulse graph
+  if (FingerPresent) {
+    for (int i = 0; i < PULSE_GRAPH_LENGTH - 1; i++) {
+      // Get current and next point, adjusting for circular buffer
+      int x1 = 10 + i;
+      int y1 = SCREEN_HEIGHT - 1 - ir_history[(ir_history_index + i) % PULSE_GRAPH_LENGTH] / 2; // Divided by 2 to fit the graph
+
+      int x2 = 10 + i + 1;
+      int y2 = SCREEN_HEIGHT - 1 - ir_history[(ir_history_index + i + 1) % PULSE_GRAPH_LENGTH] / 2;
+      display.drawLine(x1, y1, x2, y2, SSD1306_WHITE);
+    }
+  }
   display.display();
 }
