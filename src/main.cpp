@@ -14,7 +14,7 @@
 /*******************************End of Include Files*****************************/
 
 /*******************************Macro Definitions********************************/ 
-#define VERSION "1.6" //Current firmware version
+#define VERSION "1.7" //Current firmware version
 
 #define LED_INTERVAL        1000     // 1 sec
 #define OTA_INTERVAL        60000    // 60 sec
