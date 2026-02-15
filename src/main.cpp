@@ -14,7 +14,7 @@
 /*******************************End of Include Files*****************************/
 
 /*******************************Macro Definitions********************************/ 
-#define VERSION "1.8" //Current firmware version
+#define VERSION "1.9" //Current firmware version
 
 #define LED_INTERVAL        1000     // 1 sec
 #define OTA_INTERVAL        60000    // 60 sec
@@ -34,7 +34,10 @@
 /*******************************Global Variables********************************/
 uint32_t LastBeat = 0;
 int BPM = 0;
+int LastStableBPM = 0;
 bool FingerPresent = false;
+bool WasFingerPresent = false;
+bool ShowFinalResult = false;
 unsigned long LastDisplayUpdate = 0;
 unsigned long LastUpdate = 0;
 int Progress = 0;
@@ -245,7 +248,8 @@ void loop() {
   }
 
   /* ---------------- OTA CHECK (timed) ---------------- */
-  if (now - LastOtaCheck >= OTA_INTERVAL) {
+  // Only check for updates when no finger is present to avoid interrupting heart rate reading
+  if (!FingerPresent && (now - LastOtaCheck >= OTA_INTERVAL)) {
     LastOtaCheck = now;
     checkForUpdates();
   }
@@ -351,8 +355,21 @@ void drawProgressBar(int value, char const* text) {
 void readHeartRate() {
   long irValue = ParticleSensor.getIR();
 
+  // Update IR history for graph - MUST be called every time for smooth curve
+  ir_history[ir_history_index] = (uint16_t)(irValue >> 2); 
+  ir_history_index = (ir_history_index + 1) % PULSE_GRAPH_LENGTH;
+
   if (irValue > 50000) {  // finger detected
     FingerPresent = true;
+    
+    // Start of a new reading session
+    if (!WasFingerPresent) {
+      BPM = 0;
+      ShowFinalResult = false;
+      delta_index = 0;
+      for (int i = 0; i < BPM_SAMPLE_SIZE; i++) beat_deltas[i] = 0;
+      Serial.println("New reading session started");
+    }
 
     if (checkForBeat(irValue)) {
       uint32_t now = millis();
@@ -365,15 +382,35 @@ void readHeartRate() {
 
       // Calculate average BPM from stored deltas
       uint32_t sum_deltas = 0;
+      int samples = 0;
       for (int i = 0; i < BPM_SAMPLE_SIZE; i++) {
-        sum_deltas += beat_deltas[i];
+        if (beat_deltas[i] > 0) {
+          sum_deltas += beat_deltas[i];
+          samples++;
+        }
       }
-      BPM = 60 / ((sum_deltas / BPM_SAMPLE_SIZE) / 1000.0);
+      
+      if (samples > 0) {
+        BPM = 60000 / (sum_deltas / samples);
+        if (BPM > 30 && BPM < 220) {
+          LastStableBPM = BPM; // Keep track of the last valid reading
+        }
+      }
     }
   } else {
     FingerPresent = false;
-    BPM = 0;
+    
+    // End of a reading session
+    if (WasFingerPresent) {
+      if (LastStableBPM > 0) {
+        ShowFinalResult = true;
+      }
+      // Clear history when finger removed for clean start
+      for(int i=0; i<PULSE_GRAPH_LENGTH; i++) ir_history[i] = 0;
+      Serial.println("Finger removed. Session ended.");
+    }
   }
+  WasFingerPresent = FingerPresent;
 }
 
 // This function draws heart rate information on the OLED display
@@ -386,24 +423,49 @@ void drawHeartRate() {
   display.setCursor(28, 0);
   display.print("Heart Monitor");
 
-  // Display BPM or "Place finger"
-  display.setCursor(48, 16);
-  if (FingerPresent && BPM > 30 && BPM < 200) {
-    display.printf("HR %d", BPM);
+  // Display BPM, Final Result, or "Place finger"
+  display.setCursor(35, 18);
+  if (FingerPresent) {
+    if (BPM > 30 && BPM < 220) {
+      display.setTextSize(2);
+      display.printf("%d", BPM);
+      display.setTextSize(1);
+      display.print(" BPM");
+    } else {
+      display.print("Measuring...");
+    }
+  } else if (ShowFinalResult) {
+    display.print("Final HR: ");
+    display.setTextSize(2);
+    display.printf("%d", LastStableBPM);
+    display.setTextSize(1);
+    display.print(" BPM");
+    
+    display.setCursor(20, 45);
+    display.print("Finger removed");
   } else {
+    display.setCursor(28, 25);
     display.print("Place finger");
   }
 
-  // Draw pulse graph
+  // Draw pulse graph only when finger is present
   if (FingerPresent) {
-    for (int i = 0; i < PULSE_GRAPH_LENGTH - 1; i++) {
-      // Get current and next point, adjusting for circular buffer
-      int x1 = 10 + i;
-      int y1 = SCREEN_HEIGHT - 1 - ir_history[(ir_history_index + i) % PULSE_GRAPH_LENGTH] / 2; // Divided by 2 to fit the graph
+    // Auto-scale the graph based on recent min/max
+    uint16_t min_ir = 65535;
+    uint16_t max_ir = 0;
+    
+    for (int i = 0; i < PULSE_GRAPH_LENGTH; i++) {
+      if (ir_history[i] < min_ir) min_ir = ir_history[i];
+      if (ir_history[i] > max_ir) max_ir = ir_history[i];
+    }
+    
+    // Ensure we have some range to avoid division by zero in map()
+    if (max_ir - min_ir < 10) max_ir = min_ir + 10;
 
-      int x2 = 10 + i + 1;
-      int y2 = SCREEN_HEIGHT - 1 - ir_history[(ir_history_index + i + 1) % PULSE_GRAPH_LENGTH] / 2;
-      display.drawLine(x1, y1, x2, y2, SSD1306_WHITE);
+    for (int i = 0; i < PULSE_GRAPH_LENGTH - 1; i++) {
+      int y1 = map(ir_history[(ir_history_index + i) % PULSE_GRAPH_LENGTH], min_ir, max_ir, SCREEN_HEIGHT - 1, 38);
+      int y2 = map(ir_history[(ir_history_index + i + 1) % PULSE_GRAPH_LENGTH], min_ir, max_ir, SCREEN_HEIGHT - 1, 38);
+      display.drawLine(10 + i, y1, 10 + i + 1, y2, SSD1306_WHITE);
     }
   }
   display.display();
